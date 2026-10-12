@@ -80,6 +80,9 @@ type Session interface {
 	SetStatus(ctx context.Context, s Status, descr string) error
 	// Notify subscribes to the status of the given contacts.
 	Notify(ctx context.Context, contacts []UIN) error
+	// RequestImage asks the sender's client for an image of a message.
+	// The image arrives as an *ImageEvent.
+	RequestImage(ctx context.Context, from UIN, ref ImageRef) error
 	// SetBlocked tells the server to block or unblock messages from a number
 	// for this session. Blocks must be sent again after each login.
 	SetBlocked(ctx context.Context, uin UIN, blocked bool) error
@@ -175,6 +178,9 @@ type MessageEvent struct {
 	HTML   string
 	// Offline is true if the server stored the message while the account was offline.
 	Offline bool
+	// Images are the GG image protocol images in the message. Request them
+	// with Session.RequestImage. They arrive as *ImageEvent.
+	Images []ImageRef
 }
 
 // OwnMessageEvent is a message that the account owner sent from another GG session (multilogon).
@@ -219,6 +225,14 @@ type TypingEvent struct {
 	Length int
 }
 
+// ImageEvent carries an image that RequestImage asked for.
+type ImageEvent struct {
+	Sender   UIN
+	Ref      ImageRef
+	FileName string
+	Data     []byte
+}
+
 // ContactListPutEvent is the answer to PutContactList.
 type ContactListPutEvent struct {
 	// Accepted is false if the list changed on the server since the edit started.
@@ -261,6 +275,7 @@ func (*AckEvent) isEvent()                {}
 func (*StatusEvent) isEvent()             {}
 func (*TypingEvent) isEvent()             {}
 func (*ContactListEvent) isEvent()        {}
+func (*ImageEvent) isEvent()              {}
 func (*ContactListPutEvent) isEvent()     {}
 func (*ContactListVersionEvent) isEvent() {}
 func (*MultilogonInfoEvent) isEvent()     {}

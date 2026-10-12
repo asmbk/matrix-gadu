@@ -74,6 +74,12 @@ func (gc *GaduClient) mediaPart(ctx context.Context, portal *bridgev2.Portal, in
 	if err != nil {
 		return nil, err
 	}
+	return uploadMediaPart(ctx, portal, intent, m)
+}
+
+// uploadMediaPart uploads a file to Matrix and returns it as an image or video message.
+func uploadMediaPart(ctx context.Context, portal *bridgev2.Portal, intent bridgev2.MatrixAPI, m *gadu.RemoteMedia) (*bridgev2.ConvertedMessagePart, error) {
+	var err error
 	content := &event.MessageEventContent{
 		MsgType:  event.MsgImage,
 		Body:     m.FileName,

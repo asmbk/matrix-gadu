@@ -87,7 +87,9 @@ type GaduClient struct {
 	blocked map[gadu.UIN]bool
 	// lastRead holds the last read receipt of the user in each room.
 	lastRead map[id.RoomID]id.EventID
-	avatars  map[gadu.UIN]cachedAvatar
+	// images holds the images that the bridge requested and not received yet.
+	images  map[imageKey]time.Time
+	avatars map[gadu.UIN]cachedAvatar
 	// lowPriority holds the last low priority state that the bridge applied to each room.
 	lowPriority map[gadu.UIN]bool
 	acks        map[gadu.Seq]pendingAck
@@ -125,6 +127,7 @@ func newClient(main *GaduConnector, login *bridgev2.UserLogin, uin gadu.UIN) *Ga
 		notified:                make(map[gadu.UIN]struct{}),
 		blocked:                 make(map[gadu.UIN]bool),
 		lastRead:                make(map[id.RoomID]id.EventID),
+		images:                  make(map[imageKey]time.Time),
 		avatars:                 make(map[gadu.UIN]cachedAvatar),
 		lowPriority:             make(map[gadu.UIN]bool),
 		acks:                    make(map[gadu.Seq]pendingAck),

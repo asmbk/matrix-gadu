@@ -24,6 +24,8 @@ static struct gg_session *mg_login(uin_t uin, const char *password, int status, 
 	p.encoding = GG_ENCODING_UTF8;
 	p.resolver = GG_RESOLVER_PTHREAD;
 	p.tls = tls;
+	// Without an image size, older clients (Kadu) do not send images.
+	p.image_size = 255;
 	// GG_FEATURE_ALL does not include GG_FEATURE_MULTILOGON.
 	p.protocol_features = GG_FEATURE_ALL | (multilogon ? GG_FEATURE_MULTILOGON : 0);
 	p.struct_size = sizeof(p);
@@ -43,6 +45,7 @@ static struct gg_event_ack110 *mg_ack110(struct gg_event *e) { return &e->event.
 static struct gg_event_status60 *mg_status60(struct gg_event *e) { return &e->event.status60; }
 static struct gg_event_notify60 *mg_notify60_at(struct gg_event *e, int i) { return &e->event.notify60[i]; }
 static struct gg_event_typing_notification *mg_typing(struct gg_event *e) { return &e->event.typing_notification; }
+static struct gg_event_image_reply *mg_image_reply(struct gg_event *e) { return &e->event.image_reply; }
 static struct gg_event_userlist100_reply *mg_userlist100(struct gg_event *e) { return &e->event.userlist100_reply; }
 static uint32_t mg_userlist100_version(struct gg_event *e) { return e->event.userlist100_version.version; }
 static struct gg_event_multilogon_info *mg_multilogon_info(struct gg_event *e) { return &e->event.multilogon_info; }
@@ -399,12 +402,22 @@ func (s *session) handleEvent(gs *C.struct_gg_session, ge *C.struct_gg_event, co
 			log.Debug().Uint32("sender", uint32(msg.sender)).Uint64("chat_id", uint64(msg.chat_id)).Msg("Ignoring message")
 			return false
 		}
+		html := C.GoString(msg.xhtml_message)
+		var formats []byte
+		if msg.formats != nil && msg.formats_length > 0 {
+			formats = C.GoBytes(msg.formats, msg.formats_length)
+		}
+		images := gadu.MergeImageRefs(gadu.ParseRichTextImages(formats), gadu.ParseHTMLImages(html))
+		if len(images) > 0 {
+			log.Debug().Uint32("sender", uint32(msg.sender)).Int("images", len(images)).Msg("Message with GG images")
+		}
 		s.emit(&gadu.MessageEvent{
 			Sender:  gadu.UIN(msg.sender),
 			Time:    time.Unix(int64(msg.time), 0),
 			Plain:   C.GoString((*C.char)(unsafe.Pointer(msg.message))),
-			HTML:    C.GoString(msg.xhtml_message),
+			HTML:    html,
 			Offline: msg.msgclass&C.GG_CLASS_QUEUED != 0,
+			Images:  images,
 		})
 	case C.GG_EVENT_MULTILOGON_MSG:
 		msg := C.mg_multilogon_msg(ge)
@@ -459,6 +472,18 @@ func (s *session) handleEvent(gs *C.struct_gg_session, ge *C.struct_gg_event, co
 			return false
 		}
 		s.emit(&gadu.ContactListEvent{Version: uint32(r.version), Contacts: contacts, Raw: raw})
+	case C.GG_EVENT_IMAGE_REPLY:
+		r := C.mg_image_reply(ge)
+		if r.image == nil || r.size == 0 {
+			log.Debug().Uint32("sender", uint32(r.sender)).Msg("Empty image reply")
+			return false
+		}
+		s.emit(&gadu.ImageEvent{
+			Sender:   gadu.UIN(r.sender),
+			Ref:      gadu.ImageRef{CRC32: uint32(r.crc32), Size: uint32(r.size)},
+			FileName: C.GoString(r.filename),
+			Data:     C.GoBytes(unsafe.Pointer(r.image), C.int(r.size)),
+		})
 	case C.GG_EVENT_USERLIST100_VERSION:
 		s.emit(&gadu.ContactListVersionEvent{Version: uint32(C.mg_userlist100_version(ge))})
 	case C.GG_EVENT_MULTILOGON_INFO:
@@ -539,6 +564,15 @@ func (s *session) RequestContactList(ctx context.Context) error {
 		ret, err := C.gg_userlist100_request(gs, C.GG_USERLIST100_GET, 0, C.GG_USERLIST100_FORMAT_TYPE_GG100, nil)
 		if ret < 0 {
 			return fmt.Errorf("gg_userlist100_request: %w", err)
+		}
+		return nil
+	})
+}
+
+func (s *session) RequestImage(ctx context.Context, from gadu.UIN, ref gadu.ImageRef) error {
+	return s.do(ctx, func(gs *C.struct_gg_session) error {
+		if ret, err := C.gg_image_request(gs, C.uin_t(from), C.int(ref.Size), C.uint32_t(ref.CRC32)); ret < 0 {
+			return fmt.Errorf("gg_image_request: %w", err)
 		}
 		return nil
 	})

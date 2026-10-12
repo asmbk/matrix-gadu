@@ -35,8 +35,10 @@ type Network struct {
 	// Puts counts the PutContactList calls.
 	Puts int
 	// Blocked holds the numbers that the current sessions block.
-	Blocked  map[gadu.UIN]bool
-	connects chan *Session
+	Blocked map[gadu.UIN]bool
+	// ImageRequests holds the RequestImage calls.
+	ImageRequests []gadu.ImageRef
+	connects      chan *Session
 }
 
 // NewNetwork creates an empty fake network.
@@ -227,6 +229,24 @@ func (s *Session) SetBlocked(ctx context.Context, uin gadu.UIN, blocked bool) er
 		delete(s.net.Blocked, uin)
 	}
 	return nil
+}
+
+// RequestImage records the request. Tests answer with Inject(&gadu.ImageEvent{...}).
+func (s *Session) RequestImage(ctx context.Context, from gadu.UIN, ref gadu.ImageRef) error {
+	if err := s.check(); err != nil {
+		return err
+	}
+	s.net.mu.Lock()
+	defer s.net.mu.Unlock()
+	s.net.ImageRequests = append(s.net.ImageRequests, ref)
+	return nil
+}
+
+// ImageRequestCount returns the number of image requests.
+func (n *Network) ImageRequestCount() int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return len(n.ImageRequests)
 }
 
 // IsBlocked tells if a session blocked the number.

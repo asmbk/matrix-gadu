@@ -916,3 +916,48 @@ func TestNoRoomNameBeforeContactList(t *testing.T) {
 		t.Errorf("room name after the contact list = %+v", info)
 	}
 }
+
+func TestGGImageProtocol(t *testing.T) {
+	net := fake.NewNetwork()
+	client, rec := newTestClient(t, net)
+	client.Connect(context.Background())
+	sess := waitSession(t, net)
+	ref := gadu.ImageRef{CRC32: 0xdeadbeef, Size: 4}
+	sess.Inject(&gadu.MessageEvent{Sender: contactUIN, Plain: " ", HTML: `<img name="deadbeef00000004">`, Time: time.Now(), Images: []gadu.ImageRef{ref}})
+	deadline := time.Now().Add(5 * time.Second)
+	for net.ImageRequestCount() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("no image request")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// An image that nobody asked for is dropped.
+	sess.Inject(&gadu.ImageEvent{Sender: contactUIN, Ref: gadu.ImageRef{CRC32: 1, Size: 4}, Data: []byte("\x89PNG")})
+	sess.Inject(&gadu.ImageEvent{Sender: contactUIN, Ref: ref, FileName: "C:\\x\\kot.png", Data: []byte("\x89PNG\r\n\x1a\n")})
+	rec.waitFor(t, "image message", func() bool {
+		for _, e := range rec.events {
+			if _, ok := e.(*simplevent.Message[*gadu.RemoteMedia]); ok {
+				return true
+			}
+		}
+		return false
+	})
+	time.Sleep(50 * time.Millisecond)
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	var images, texts int
+	for _, e := range rec.events {
+		switch m := e.(type) {
+		case *simplevent.Message[*gadu.RemoteMedia]:
+			images++
+			if m.Data.MimeType != "image/png" || m.Data.FileName != "kot.png" {
+				t.Errorf("image = %q %q", m.Data.MimeType, m.Data.FileName)
+			}
+		case *simplevent.Message[*gadu.MessageEvent]:
+			texts++
+		}
+	}
+	if images != 1 || texts != 0 {
+		t.Errorf("images=%d texts=%d, want 1 image and no empty text message", images, texts)
+	}
+}

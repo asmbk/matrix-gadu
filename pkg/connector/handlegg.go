@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -39,6 +40,8 @@ func (gc *GaduClient) handleGGEvent(ctx context.Context, evt gadu.Event) {
 		gc.handleAck(e)
 	case *gadu.ContactListEvent:
 		gc.handleContactList(ctx, e)
+	case *gadu.ImageEvent:
+		gc.handleImage(ctx, e)
 	case *gadu.ContactListPutEvent:
 		gc.handleContactListPut(e)
 	case *gadu.ContactListVersionEvent:
@@ -61,6 +64,14 @@ func (gc *GaduClient) handleMessage(ctx context.Context, e *gadu.MessageEvent) {
 	}
 	// A message from a number outside the contact list creates a room, so follow its status.
 	gc.subscribe(ctx, e.Sender)
+	if len(e.Images) > 0 {
+		gc.requestImages(ctx, e)
+		e.HTML = gadu.StripHTMLImages(e.HTML)
+		if strings.TrimSpace(e.Plain) == "" {
+			// Kadu sends a space as the text of an image-only message.
+			return
+		}
+	}
 	gc.queueEvent(&simplevent.Message[*gadu.MessageEvent]{
 		EventMeta: simplevent.EventMeta{
 			Type: bridgev2.RemoteEventMessage,
