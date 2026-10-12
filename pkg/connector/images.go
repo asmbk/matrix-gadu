@@ -42,7 +42,9 @@ func (gc *GaduClient) requestImages(ctx context.Context, e *gadu.MessageEvent) {
 	}
 	var want []gadu.ImageRef
 	for i, ref := range e.Images {
-		if i >= maxMediaPerMessage || ref.Size == 0 || ref.Size > gadu.MaxImageSizeKiB*1024 {
+		// The announced size limit is a request, not a rule: Kadu asks its user
+		// and sends larger images too. Only the general media limit applies.
+		if i >= maxMediaPerMessage || ref.Size == 0 || ref.Size > gadu.MaxMediaSize {
 			continue
 		}
 		key := imageKey{e.Sender, ref}

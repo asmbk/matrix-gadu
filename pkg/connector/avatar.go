@@ -13,7 +13,8 @@ import (
 	"github.com/asmbk/matrix-gadu/pkg/gadu"
 )
 
-const defaultAvatarFetchInterval = 100 * time.Millisecond
+// defaultAvatarFetchInterval keeps the avatar server from answering HTTP 429.
+const defaultAvatarFetchInterval = 500 * time.Millisecond
 
 var avatarHTTPClient = gadu.NewSafeHTTPClient(15 * time.Second)
 
