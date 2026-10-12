@@ -40,11 +40,16 @@ func (gc *GaduClient) requestImages(ctx context.Context, e *gadu.MessageEvent) {
 			delete(gc.images, k)
 		}
 	}
-	var want []gadu.ImageRef
+	var want, tooLarge []gadu.ImageRef
 	for i, ref := range e.Images {
-		// The announced size limit is a request, not a rule: Kadu asks its user
-		// and sends larger images too. Only the general media limit applies.
-		if i >= maxMediaPerMessage || ref.Size == 0 || ref.Size > gadu.MaxMediaSize {
+		if i >= maxMediaPerMessage || ref.Size == 0 {
+			continue
+		}
+		// Kadu can send larger images, but GG relays an image as many small
+		// packets, and the GG server disconnects the sender of a large one
+		// for flooding. So the bridge does not ask, and says so in the room.
+		if ref.Size > gadu.MaxImageSizeKiB*1024 {
+			tooLarge = append(tooLarge, ref)
 			continue
 		}
 		key := imageKey{e.Sender, ref}
@@ -59,6 +64,9 @@ func (gc *GaduClient) requestImages(ctx context.Context, e *gadu.MessageEvent) {
 		if err := sess.RequestImage(ctx, e.Sender, ref); err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Stringer("sender_uin", e.Sender).Msg("Failed to request a GG image")
 		}
+	}
+	for i, ref := range tooLarge {
+		gc.noticeImageTooLarge(e, i, ref)
 	}
 	if len(e.Images) > len(want) {
 		zerolog.Ctx(ctx).Debug().Int("images", len(e.Images)).Int("requested", len(want)).Msg("Skipped some GG images")
@@ -206,4 +214,27 @@ func (gc *GaduClient) handleImageRequest(ctx context.Context, e *gadu.ImageReque
 		return
 	}
 	zerolog.Ctx(ctx).Debug().Stringer("sender_uin", e.Sender).Int("size", len(img.data)).Msg("Sent a GG image")
+}
+
+// noticeImageTooLarge tells the user in the room about an image that the
+// bridge did not request.
+func (gc *GaduClient) noticeImageTooLarge(e *gadu.MessageEvent, i int, ref gadu.ImageRef) {
+	text := fmt.Sprintf("[Image of %d KiB not transferred: GG disconnects the sender of images over %d KiB. Ask for a smaller image or a link.]", ref.Size/1024, gadu.MaxImageSizeKiB)
+	gc.queueEvent(&simplevent.Message[string]{
+		EventMeta: simplevent.EventMeta{
+			Type:         bridgev2.RemoteEventMessage,
+			PortalKey:    gc.makePortalKey(e.Sender),
+			Sender:       gc.makeEventSender(e.Sender),
+			CreatePortal: true,
+			Timestamp:    e.Time,
+		},
+		Data: text,
+		ID:   networkid.MessageID(fmt.Sprintf("bigimg:%d:%d:%d:%08x", e.Sender, e.Time.UnixNano(), i, ref.CRC32)),
+		ConvertMessageFunc: func(ctx context.Context, portal *bridgev2.Portal, intent bridgev2.MatrixAPI, data string) (*bridgev2.ConvertedMessage, error) {
+			return &bridgev2.ConvertedMessage{Parts: []*bridgev2.ConvertedMessagePart{{
+				Type:    event.EventMessage,
+				Content: &event.MessageEventContent{MsgType: event.MsgNotice, Body: data},
+			}}}, nil
+		},
+	})
 }

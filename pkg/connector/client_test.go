@@ -1067,18 +1067,22 @@ func TestOutImageLimitFromStatus(t *testing.T) {
 	}
 }
 
-func TestLargeGGImageRequested(t *testing.T) {
+func TestLargeGGImageNotRequested(t *testing.T) {
 	net := fake.NewNetwork()
-	client, _ := newTestClient(t, net)
+	client, rec := newTestClient(t, net)
 	client.Connect(context.Background())
 	sess := waitSession(t, net)
 	big := gadu.ImageRef{CRC32: 7, Size: 2 << 20}
 	sess.Inject(&gadu.MessageEvent{Sender: contactUIN, Plain: " ", Time: time.Now(), Images: []gadu.ImageRef{big}})
-	deadline := time.Now().Add(5 * time.Second)
-	for net.ImageRequestCount() == 0 {
-		if time.Now().After(deadline) {
-			t.Fatal("a 2 MB image was not requested")
+	rec.waitFor(t, "notice", func() bool {
+		for _, e := range rec.events {
+			if _, ok := e.(*simplevent.Message[string]); ok {
+				return true
+			}
 		}
-		time.Sleep(10 * time.Millisecond)
+		return false
+	})
+	if n := net.ImageRequestCount(); n != 0 {
+		t.Errorf("requested a 2 MB image (%d requests); GG disconnects the sender", n)
 	}
 }
