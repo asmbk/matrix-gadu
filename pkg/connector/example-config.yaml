@@ -1,0 +1,36 @@
+# Ghost display name template. Fields: .UIN .ShowName .Nickname .FirstName .LastName .FullName
+# The fields come from the GG contact list. The bridge uses the GG number if the result is empty.
+displayname_template: "{{or .ShowName .Nickname .FullName .UIN}}"
+# Status while the bridge is connected: available, ffc, busy, dnd or invisible.
+initial_status: available
+# Ask the GG servers to keep other sessions of the account (for example the phone app) online.
+multilogon: true
+# TLS mode: "required" rejects bad server certificates, "enabled" accepts them.
+tls: required
+# The bridge splits outgoing messages that are longer than this number of characters.
+max_message_length: 1900
+# Create a room for every contact on the GG contact list, so that all contacts are visible
+# in the client. The bridge checks the list after each login and adds rooms for new contacts.
+# If false, a room appears only when a chat starts. Use false on a server with many users,
+# because each user gets a room for every contact.
+contact_rooms: true
+# Write the status of the contact into the room topic, for example "🟡 Busy – at work".
+# This helps in clients that do not show Matrix presence (for example NeoChat). Each change
+# is a state event in the room, so some clients show a line for it in the timeline.
+status_in_topic: false
+# Put a status emoji in front of the room name, for example "🟢 Kuba". The status is then
+# visible in the room list of every client. Each change is a state event in the room.
+status_in_name: false
+# Show any link in a GG message that points to an image as the image itself. GG Drive images
+# and Giphy GIFs are always shown. The bridge connects only to public addresses, but the owner
+# of a linked server sees the IP address of the bridge.
+image_links: false
+# Move the rooms of offline contacts to the low priority section of the room list, so that
+# online contacts stay at the top. The bridge sets the tag with double puppeting, so this
+# needs double puppeting. Tags cause no room events. The bridge never changes a room that
+# you tagged as favourite or low priority yourself.
+offline_low_priority: false
+# Mark the room name and topic changes of status_in_name and status_in_topic as read, so that
+# clients that count them as unread (NeoChat) do not show unread rooms after a status change.
+# The bridge does it only when you read everything else in the room. Needs double puppeting.
+status_changes_read: false

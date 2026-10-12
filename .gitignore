@@ -1,0 +1,8 @@
+/.deps/
+/matrix-gadu
+/gadu-spike
+*.db
+*.db-*
+logs/
+config.yaml
+registration.yaml
