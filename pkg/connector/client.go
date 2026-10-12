@@ -54,6 +54,7 @@ type GaduClient struct {
 	setPresence    func(context.Context, gadu.UIN, contactStatus) error
 	setLowPriority func(context.Context, gadu.UIN, bool) error
 	markStatusRead func(context.Context, *bridgev2.Portal)
+	downloadMedia  func(context.Context, *event.MessageEventContent) ([]byte, error)
 	roomPeers      func(context.Context) []gadu.UIN
 	fetchAvatar    func(context.Context, gadu.UIN) (*gadu.Avatar, error)
 	fetchMedia     func(context.Context, gadu.MediaLink) (*gadu.RemoteMedia, error)
@@ -88,8 +89,12 @@ type GaduClient struct {
 	// lastRead holds the last read receipt of the user in each room.
 	lastRead map[id.RoomID]id.EventID
 	// images holds the images that the bridge requested and not received yet.
-	images  map[imageKey]time.Time
-	avatars map[gadu.UIN]cachedAvatar
+	images map[imageKey]time.Time
+	// outImages holds the images that the bridge sent, until the contact asks for them.
+	outImages map[imageKey]outImage
+	// imageLimits holds the largest image in KiB that each contact accepts.
+	imageLimits map[gadu.UIN]int
+	avatars     map[gadu.UIN]cachedAvatar
 	// lowPriority holds the last low priority state that the bridge applied to each room.
 	lowPriority map[gadu.UIN]bool
 	acks        map[gadu.Seq]pendingAck
@@ -128,6 +133,8 @@ func newClient(main *GaduConnector, login *bridgev2.UserLogin, uin gadu.UIN) *Ga
 		blocked:                 make(map[gadu.UIN]bool),
 		lastRead:                make(map[id.RoomID]id.EventID),
 		images:                  make(map[imageKey]time.Time),
+		outImages:               make(map[imageKey]outImage),
+		imageLimits:             make(map[gadu.UIN]int),
 		avatars:                 make(map[gadu.UIN]cachedAvatar),
 		lowPriority:             make(map[gadu.UIN]bool),
 		acks:                    make(map[gadu.Seq]pendingAck),
@@ -141,6 +148,13 @@ func newClient(main *GaduConnector, login *bridgev2.UserLogin, uin gadu.UIN) *Ga
 	client.setPresence = client.setGhostPresence
 	client.setLowPriority = client.setRoomLowPriority
 	client.markStatusRead = client.markStatusChangeRead
+	client.downloadMedia = func(ctx context.Context, content *event.MessageEventContent) ([]byte, error) {
+		uri := content.URL
+		if content.File != nil {
+			uri = content.File.URL
+		}
+		return main.br.Bot.DownloadMedia(ctx, uri, content.File)
+	}
 	client.roomPeers = client.listRoomPeers
 	client.fetchAvatar = fetchGGAvatar
 	client.fetchMedia = fetchGGMedia

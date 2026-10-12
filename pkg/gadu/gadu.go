@@ -80,6 +80,8 @@ type Session interface {
 	SetStatus(ctx context.Context, s Status, descr string) error
 	// Notify subscribes to the status of the given contacts.
 	Notify(ctx context.Context, contacts []UIN) error
+	// SendImage answers an *ImageRequestEvent with the image data.
+	SendImage(ctx context.Context, to UIN, fileName string, data []byte) error
 	// RequestImage asks the sender's client for an image of a message.
 	// The image arrives as an *ImageEvent.
 	RequestImage(ctx context.Context, from UIN, ref ImageRef) error
@@ -217,12 +219,21 @@ type StatusEvent struct {
 	UIN         UIN
 	Status      Status
 	Description string
+	// ImageSizeKiB is the largest image that the contact accepts, or 0 if unknown.
+	ImageSizeKiB int
 }
 
 // TypingEvent reports that a contact types. A length of 0 means "stopped typing".
 type TypingEvent struct {
 	UIN    UIN
 	Length int
+}
+
+// ImageRequestEvent means that a contact asks for an image of a message
+// that this session sent. Answer with Session.SendImage.
+type ImageRequestEvent struct {
+	Sender UIN
+	Ref    ImageRef
 }
 
 // ImageEvent carries an image that RequestImage asked for.
@@ -275,6 +286,7 @@ func (*AckEvent) isEvent()                {}
 func (*StatusEvent) isEvent()             {}
 func (*TypingEvent) isEvent()             {}
 func (*ContactListEvent) isEvent()        {}
+func (*ImageRequestEvent) isEvent()       {}
 func (*ImageEvent) isEvent()              {}
 func (*ContactListPutEvent) isEvent()     {}
 func (*ContactListVersionEvent) isEvent() {}

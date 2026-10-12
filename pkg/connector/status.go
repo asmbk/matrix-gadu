@@ -158,6 +158,9 @@ func (gc *GaduClient) handleStatus(ctx context.Context, e *gadu.StatusEvent) {
 	}
 	s := contactStatus{Status: e.Status, Description: e.Description}
 	gc.mu.Lock()
+	if e.ImageSizeKiB > 0 {
+		gc.imageLimits[e.UIN] = e.ImageSizeKiB
+	}
 	prev, had := gc.statuses[e.UIN]
 	gc.statuses[e.UIN] = s
 	gc.mu.Unlock()

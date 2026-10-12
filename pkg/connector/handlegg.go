@@ -40,6 +40,8 @@ func (gc *GaduClient) handleGGEvent(ctx context.Context, evt gadu.Event) {
 		gc.handleAck(e)
 	case *gadu.ContactListEvent:
 		gc.handleContactList(ctx, e)
+	case *gadu.ImageRequestEvent:
+		gc.handleImageRequest(ctx, e)
 	case *gadu.ImageEvent:
 		gc.handleImage(ctx, e)
 	case *gadu.ContactListPutEvent:

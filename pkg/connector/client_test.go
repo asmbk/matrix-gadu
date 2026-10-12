@@ -1,8 +1,12 @@
 package connector
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"reflect"
 	"strings"
 	"sync"
@@ -163,6 +167,9 @@ func newTestClient(t *testing.T, net *fake.Network) (*GaduClient, *recorder) {
 	client.avatarFetchInterval = time.Millisecond
 	client.fetchMedia = func(context.Context, gadu.MediaLink) (*gadu.RemoteMedia, error) { return nil, gadu.ErrNotDownloadable }
 	client.publicMediaURL = func(context.Context, *event.MessageEventContent) (string, error) { return "", nil }
+	client.downloadMedia = func(context.Context, *event.MessageEventContent) ([]byte, error) {
+		return nil, errors.New("no media in tests")
+	}
 	t.Cleanup(client.Disconnect)
 	return client, rec
 }
@@ -959,5 +966,103 @@ func TestGGImageProtocol(t *testing.T) {
 	}
 	if images != 1 || texts != 0 {
 		t.Errorf("images=%d texts=%d, want 1 image and no empty text message", images, texts)
+	}
+}
+
+func testPNG(t *testing.T, w, h int, noise bool) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			c := color.NRGBA{uint8(x), uint8(y), 128, 255}
+			if noise {
+				c = color.NRGBA{uint8(x*7919 + y*104729), uint8(x * y), uint8(x ^ y), 255}
+			}
+			img.SetNRGBA(x, y, c)
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestFitImage(t *testing.T) {
+	small := testPNG(t, 20, 10, false)
+	out, name, err := fitImage(small, "a.png", 255*1024)
+	if err != nil || !bytes.Equal(out, small) || name != "a.png" {
+		t.Errorf("small image changed: %d bytes, %q, %v", len(out), name, err)
+	}
+	big := testPNG(t, 2000, 1500, true)
+	if len(big) <= 255*1024 {
+		t.Fatalf("test image too small: %d", len(big))
+	}
+	out, name, err = fitImage(big, "photo.png", 255*1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(out))
+	if err != nil || format != "jpeg" || len(out) > 255*1024 || name != "photo.jpg" || cfg.Width > 1600 {
+		t.Errorf("fitted: %d bytes, %s %dx%d, %q, %v", len(out), format, cfg.Width, cfg.Height, name, err)
+	}
+	if _, _, err := fitImage([]byte("not an image"), "x", 1000); err == nil {
+		t.Error("garbage accepted")
+	}
+}
+
+func TestSendGGImage(t *testing.T) {
+	net := fake.NewNetwork()
+	client, rec := newTestClient(t, net)
+	pic := testPNG(t, 30, 20, false)
+	client.downloadMedia = func(context.Context, *event.MessageEventContent) ([]byte, error) { return pic, nil }
+	client.publicMediaURL = func(_ context.Context, c *event.MessageEventContent) (string, error) {
+		return "https://matrix.example.org/m/" + c.FileName, nil
+	}
+	client.Connect(context.Background())
+	sess := waitSession(t, net)
+	rec.waitFor(t, "connected state", rec.hasState(status.StateConnected))
+
+	portal := &bridgev2.Portal{Portal: &database.Portal{PortalKey: client.makePortalKey(contactUIN)}}
+	msg := &bridgev2.MatrixMessage{}
+	msg.Portal = portal
+	msg.Content = &event.MessageEventContent{MsgType: event.MsgImage, Body: "kot.png", FileName: "kot.png"}
+	if _, err := client.HandleMatrixMessage(context.Background(), msg); err != nil {
+		t.Fatal(err)
+	}
+	ref := gadu.ImageRefFor(pic)
+	sent := net.SentMessages()
+	if len(sent) != 1 || !strings.HasPrefix(sent[0].HTML, gadu.HTMLImageTag(ref)) || !strings.Contains(sent[0].HTML, "https://matrix.example.org/m/kot.png") {
+		t.Fatalf("sent = %+v", sent)
+	}
+	// Another contact cannot get the image.
+	sess.Inject(&gadu.ImageRequestEvent{Sender: contactUIN + 1, Ref: ref})
+	sess.Inject(&gadu.ImageRequestEvent{Sender: contactUIN, Ref: ref})
+	deadline := time.Now().Add(5 * time.Second)
+	for len(net.SentImages()) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("no image sent")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+	images := net.SentImages()
+	if len(images) != 1 || images[0].To != contactUIN || !bytes.Equal(images[0].Data, pic) || images[0].FileName != "kot.png" {
+		t.Errorf("images = %d, first to %v name %q", len(images), images[0].To, images[0].FileName)
+	}
+}
+
+func TestOutImageLimitFromStatus(t *testing.T) {
+	net := fake.NewNetwork()
+	client, rec := newTestClient(t, net)
+	client.Connect(context.Background())
+	sess := waitSession(t, net)
+	if got := client.outImageLimit(contactUIN); got != 255*1024 {
+		t.Errorf("default limit = %d", got)
+	}
+	sess.Inject(&gadu.StatusEvent{UIN: contactUIN, Status: gadu.StatusAvailable, ImageSizeKiB: 64})
+	rec.waitFor(t, "presence", func() bool { return len(rec.presences) >= 1 })
+	if got := client.outImageLimit(contactUIN); got != 64*1024 {
+		t.Errorf("announced limit = %d", got)
 	}
 }

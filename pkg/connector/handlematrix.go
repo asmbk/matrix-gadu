@@ -15,13 +15,23 @@ import (
 
 func (gc *GaduClient) HandleMatrixMessage(ctx context.Context, msg *bridgev2.MatrixMessage) (*bridgev2.MatrixMessageResponse, error) {
 	content := msg.Content
+	// imageTag carries an image with the GG image protocol, next to the link.
+	var imageTag string
 	switch content.MsgType {
 	case event.MsgText, event.MsgNotice, event.MsgEmote:
 	case event.MsgImage, event.MsgVideo, event.MsgAudio, event.MsgFile:
-		var err error
-		if content, err = gc.mediaToGGText(ctx, content); err != nil {
-			return nil, err
+		if content.MsgType == event.MsgImage {
+			imageTag = gc.prepareOutImage(ctx, msg.Portal, content)
 		}
+		text, err := gc.mediaToGGText(ctx, content)
+		switch {
+		case err != nil && imageTag == "":
+			return nil, err
+		case err != nil:
+			// Without public media, the image alone goes to GG.
+			text = &event.MessageEventContent{MsgType: event.MsgText, Body: " "}
+		}
+		content = text
 	default:
 		return nil, fmt.Errorf("%w %s", bridgev2.ErrUnsupportedMessageType, content.MsgType)
 	}
@@ -34,6 +44,9 @@ func (gc *GaduClient) HandleMatrixMessage(ctx context.Context, msg *bridgev2.Mat
 		return nil, bridgev2.ErrNotLoggedIn
 	}
 	parts := matrixToGG(content, gc.main.Config.MaxMessageLength)
+	if imageTag != "" && len(parts) > 0 {
+		parts[0] = imageTag + parts[0]
+	}
 	now := time.Now()
 	var firstID networkid.MessageID
 	var lastSeq gadu.Seq

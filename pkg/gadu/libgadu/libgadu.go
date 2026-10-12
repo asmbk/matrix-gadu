@@ -45,6 +45,7 @@ static struct gg_event_ack110 *mg_ack110(struct gg_event *e) { return &e->event.
 static struct gg_event_status60 *mg_status60(struct gg_event *e) { return &e->event.status60; }
 static struct gg_event_notify60 *mg_notify60_at(struct gg_event *e, int i) { return &e->event.notify60[i]; }
 static struct gg_event_typing_notification *mg_typing(struct gg_event *e) { return &e->event.typing_notification; }
+static struct gg_event_image_request *mg_image_request(struct gg_event *e) { return &e->event.image_request; }
 static struct gg_event_image_reply *mg_image_reply(struct gg_event *e) { return &e->event.image_reply; }
 static struct gg_event_userlist100_reply *mg_userlist100(struct gg_event *e) { return &e->event.userlist100_reply; }
 static uint32_t mg_userlist100_version(struct gg_event *e) { return e->event.userlist100_version.version; }
@@ -439,14 +440,14 @@ func (s *session) handleEvent(gs *C.struct_gg_session, ge *C.struct_gg_event, co
 		s.emit(&gadu.AckEvent{Seq: gadu.Seq(ack.seq), State: gadu.AckSent})
 	case C.GG_EVENT_STATUS60:
 		st := C.mg_status60(ge)
-		s.emit(&gadu.StatusEvent{UIN: gadu.UIN(st.uin), Status: fromGGStatus(int(st.status)), Description: C.GoString(st.descr)})
+		s.emit(&gadu.StatusEvent{UIN: gadu.UIN(st.uin), Status: fromGGStatus(int(st.status)), Description: C.GoString(st.descr), ImageSizeKiB: int(st.image_size)})
 	case C.GG_EVENT_NOTIFY60:
 		for i := 0; ; i++ {
 			n := C.mg_notify60_at(ge, C.int(i))
 			if n.uin == 0 {
 				break
 			}
-			s.emit(&gadu.StatusEvent{UIN: gadu.UIN(n.uin), Status: fromGGStatus(int(n.status)), Description: C.GoString(n.descr)})
+			s.emit(&gadu.StatusEvent{UIN: gadu.UIN(n.uin), Status: fromGGStatus(int(n.status)), Description: C.GoString(n.descr), ImageSizeKiB: int(n.image_size)})
 		}
 	case C.GG_EVENT_TYPING_NOTIFICATION:
 		t := C.mg_typing(ge)
@@ -472,6 +473,9 @@ func (s *session) handleEvent(gs *C.struct_gg_session, ge *C.struct_gg_event, co
 			return false
 		}
 		s.emit(&gadu.ContactListEvent{Version: uint32(r.version), Contacts: contacts, Raw: raw})
+	case C.GG_EVENT_IMAGE_REQUEST:
+		r := C.mg_image_request(ge)
+		s.emit(&gadu.ImageRequestEvent{Sender: gadu.UIN(r.sender), Ref: gadu.ImageRef{CRC32: uint32(r.crc32), Size: uint32(r.size)}})
 	case C.GG_EVENT_IMAGE_REPLY:
 		r := C.mg_image_reply(ge)
 		if r.image == nil || r.size == 0 {
@@ -564,6 +568,22 @@ func (s *session) RequestContactList(ctx context.Context) error {
 		ret, err := C.gg_userlist100_request(gs, C.GG_USERLIST100_GET, 0, C.GG_USERLIST100_FORMAT_TYPE_GG100, nil)
 		if ret < 0 {
 			return fmt.Errorf("gg_userlist100_request: %w", err)
+		}
+		return nil
+	})
+}
+
+func (s *session) SendImage(ctx context.Context, to gadu.UIN, fileName string, data []byte) error {
+	if len(data) == 0 {
+		return errors.New("empty image")
+	}
+	cName := C.CString(fileName)
+	defer C.free(unsafe.Pointer(cName))
+	cData := C.CBytes(data)
+	defer C.free(cData)
+	return s.do(ctx, func(gs *C.struct_gg_session) error {
+		if ret, err := C.gg_image_reply(gs, C.uin_t(to), cName, (*C.char)(cData), C.int(len(data))); ret < 0 {
+			return fmt.Errorf("gg_image_reply: %w", err)
 		}
 		return nil
 	})

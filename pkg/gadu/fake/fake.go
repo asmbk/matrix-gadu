@@ -38,7 +38,9 @@ type Network struct {
 	Blocked map[gadu.UIN]bool
 	// ImageRequests holds the RequestImage calls.
 	ImageRequests []gadu.ImageRef
-	connects      chan *Session
+	// ImagesSent holds the SendImage calls.
+	ImagesSent []SentImage
+	connects   chan *Session
 }
 
 // NewNetwork creates an empty fake network.
@@ -229,6 +231,31 @@ func (s *Session) SetBlocked(ctx context.Context, uin gadu.UIN, blocked bool) er
 		delete(s.net.Blocked, uin)
 	}
 	return nil
+}
+
+// SendImage records the image sent to a contact.
+func (s *Session) SendImage(ctx context.Context, to gadu.UIN, fileName string, data []byte) error {
+	if err := s.check(); err != nil {
+		return err
+	}
+	s.net.mu.Lock()
+	defer s.net.mu.Unlock()
+	s.net.ImagesSent = append(s.net.ImagesSent, SentImage{To: to, FileName: fileName, Data: data})
+	return nil
+}
+
+// SentImage is an image answer that a session sent.
+type SentImage struct {
+	To       gadu.UIN
+	FileName string
+	Data     []byte
+}
+
+// SentImages returns the image answers.
+func (n *Network) SentImages() []SentImage {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return append([]SentImage(nil), n.ImagesSent...)
 }
 
 // RequestImage records the request. Tests answer with Inject(&gadu.ImageEvent{...}).

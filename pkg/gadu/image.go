@@ -2,6 +2,8 @@ package gadu
 
 import (
 	"encoding/binary"
+	"fmt"
+	"hash/crc32"
 	"regexp"
 	"strconv"
 )
@@ -92,4 +94,16 @@ var htmlImageTagRe = regexp.MustCompile(`<img[^>]*>`)
 // StripHTMLImages removes the image tags from the XHTML form of a message.
 func StripHTMLImages(html string) string {
 	return htmlImageTagRe.ReplaceAllString(html, "")
+}
+
+// ImageRefFor returns the reference of an image: its CRC32 (the same as zlib)
+// and its size.
+func ImageRefFor(data []byte) ImageRef {
+	return ImageRef{CRC32: crc32.ChecksumIEEE(data), Size: uint32(len(data))}
+}
+
+// HTMLImageTag returns the tag that puts an image reference into the XHTML
+// form of a message. libgadu turns it into image formatting for the receiver.
+func HTMLImageTag(ref ImageRef) string {
+	return fmt.Sprintf(`<img name="%08x%08x">`, ref.CRC32, ref.Size)
 }
