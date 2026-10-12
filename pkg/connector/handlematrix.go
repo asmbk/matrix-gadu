@@ -45,7 +45,9 @@ func (gc *GaduClient) HandleMatrixMessage(ctx context.Context, msg *bridgev2.Mat
 	}
 	parts := matrixToGG(content, gc.main.Config.MaxMessageLength)
 	if imageTag != "" && len(parts) > 0 {
-		parts[0] = imageTag + parts[0]
+		// A line break puts the link under the image. Without it, Kadu shows
+		// the link next to the image and wraps it oddly.
+		parts[0] = imageTag + "<br>" + parts[0]
 	}
 	now := time.Now()
 	var firstID networkid.MessageID

@@ -1032,7 +1032,7 @@ func TestSendGGImage(t *testing.T) {
 	}
 	ref := gadu.ImageRefFor(pic)
 	sent := net.SentMessages()
-	if len(sent) != 1 || !strings.HasPrefix(sent[0].HTML, gadu.HTMLImageTag(ref)) || !strings.Contains(sent[0].HTML, "https://matrix.example.org/m/kot.png") {
+	if len(sent) != 1 || !strings.HasPrefix(sent[0].HTML, gadu.HTMLImageTag(ref)+"<br>") || !strings.Contains(sent[0].HTML, "https://matrix.example.org/m/kot.png") {
 		t.Fatalf("sent = %+v", sent)
 	}
 	// Another contact cannot get the image.
