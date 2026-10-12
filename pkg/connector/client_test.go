@@ -1067,7 +1067,6 @@ func TestOutImageLimitFromStatus(t *testing.T) {
 	}
 }
 
-
 func TestLargeGGImageRequested(t *testing.T) {
 	net := fake.NewNetwork()
 	client, _ := newTestClient(t, net)
