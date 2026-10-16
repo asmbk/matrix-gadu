@@ -15,8 +15,17 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install libgadu
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgadu-dev pkg-config
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake libgnutls28-dev zlib1g-dev pkg-config
+      - name: Build libgadu
+        run: |
+          scripts/build-libgadu.sh
+          echo "PKG_CONFIG_PATH=$PWD/.deps/libgadu/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Test libgadu
+        run: |
+          cmake -S third_party -B .deps/libgadu-tests -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build .deps/libgadu-tests --parallel
+          ctest --test-dir .deps/libgadu-tests --output-on-failure
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
       - name: Vet

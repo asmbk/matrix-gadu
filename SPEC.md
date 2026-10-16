@@ -123,8 +123,9 @@ matrix-gadu/
 │   ├── handlegg.go   handlematrix.go  chatinfo.go  ids.go
 │   ├── capabilities.go  dbmeta.go  msgconv.go  commands.go
 │   └── example-config.yaml
-├── third_party/libgadu/             # git submodule: project fork of libgadu (phase 3)
-├── scripts/dev-env.sh               # build against libgadu unpacked into .deps/
+├── third_party/libgadu/             # vendored libgadu 1.12.2 with fixes (CMake, static)
+├── scripts/build-libgadu.sh         # build third_party/libgadu into .deps/libgadu
+├── scripts/dev-env.sh               # point pkg-config at .deps/libgadu
 ├── Dockerfile  docker-run.sh
 ├── SPEC.md
 ├── README.md
@@ -334,17 +335,16 @@ The README shows a minimal example for a homeserver at `example.org`.
 | Artifact | Content |
 |---|---|
 | Docker image | `ghcr.io/<owner>/matrix-gadu:<version>` and `:latest`, for `linux/amd64` and `linux/arm64` |
-| Binary | Release builds for `linux/amd64` and `linux/arm64`, dynamically linked against the bundled `libgadu.so` |
-| Source | Build with Go and the libgadu submodule |
+| Binary | Release builds for `linux/amd64` and `linux/arm64`, with libgadu linked statically |
+| Source | Build `third_party/libgadu`, then Go |
 
 ### 9.2 Container image
 
 A multi-stage `Dockerfile`:
 
-1. Build the Go binary with cgo and the `goolm` build tag (pure-Go encryption, no `libolm`).
-2. Copy the binary into a small Debian runtime image with the `libgadu3t64` package.
-
-Until the libgadu fork exists (phase 3), the image uses the Debian `libgadu` package (1.12.2). Phase 3 changes step 1 to build libgadu from `third_party/libgadu` (needs GnuTLS, protobuf-c, zlib).
+1. Build `third_party/libgadu` as a static library (needs CMake, GnuTLS and zlib).
+2. Build the Go binary with cgo and the `goolm` build tag (pure-Go encryption, no `libolm`).
+3. Copy the binary into a small Debian runtime image with the GnuTLS and zlib packages.
 
 The image runs as a non-root user and uses `/data` as the volume for config, registration and database.
 It follows the mautrix convention: on the first start without a config, it writes an example config and exits.
@@ -376,13 +376,13 @@ It follows the mautrix convention: on the first start without a config, it write
 | Dependency | Rule |
 |---|---|
 | mautrix-go | Pin the version in `go.mod`. Update every 3 months, or for security fixes. |
-| libgadu | Project fork, pinned by commit in the submodule |
+| libgadu | Vendored copy in `third_party/libgadu`. Changes are commits in this repository. |
 | Go toolchain | Pin in `go.mod` (`toolchain`) |
 | Base image | Pin by digest |
 
 ### 11.2 libgadu fork
 
-- The fork starts at tag `1.12.2` of `wojtekka/libgadu`.
+- The vendored copy (`third_party/libgadu`) starts at commit `9eb2aa0` of `wojtekka/libgadu` (1.12.2). Changes against upstream: CMake build, hub lookup over TLS on port 443, GnuTLS fixes, protobuf-c 1.5.2.
 - It carries only needed fixes: build fixes, TLS fixes, and protocol changes from the GG servers.
 - Each fix has a test, if possible.
 
@@ -454,7 +454,7 @@ It follows the mautrix convention: on the first start without a config, it write
 | **0. Spike** | `cmd/gadu-spike`: cgo login, contact list, send and receive one message, check multilogon | Login over TLS works. One message goes each way. The multilogon result is known. |
 | **1. MVP** | Connector, login flow, DM portals, text both ways, ghost names, offline messages, double puppeting, Docker image, README | Checklist items 1–6 pass. |
 | **2. Comfort** | Contact list in clients, status and presence, typing, acks, multilogon, `sync-contacts`, `status` | Checklist items 7–10 pass. |
-| **3. Release** | libgadu fork as submodule, CI, multi-arch image, binaries, `0.1.0` tag | A new user can set up the bridge from the README alone. |
+| **3. Release** | Vendored libgadu, CI, multi-arch image, binaries, `0.1.0` tag | A new user can set up the bridge from the README alone. |
 
 ### 15.1 Implementation state (2026-10-16)
 
@@ -463,7 +463,7 @@ It follows the mautrix convention: on the first start without a config, it write
 | 0 | Done. The bridge runs against the real GG servers every day since 2026-10-12. |
 | 1 | Done and in daily use. Unit and connector tests pass (with `-race`). |
 | 2 | Done: contact list for clients, typing both ways, delivery receipts, multilogon messages, `sync-contacts`, `status`, presence, avatars, contact list edits, blocking, images both ways. Multilogon is not yet tested against GG. |
-| 3 | Not started: libgadu fork, release builds, multi-arch image. CI workflow exists. |
+| 3 | Vendored libgadu and CI are done. Not started: release builds, multi-arch image. |
 
 ## 16. Risks
 

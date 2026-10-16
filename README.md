@@ -4,7 +4,7 @@ A Matrix puppeting bridge for Gadu-Gadu (GG).
 
 The bridge connects your Matrix account to your GG account. Each GG contact appears as a Matrix user (`@gg_<number>:your.server`), and each GG chat appears as a Matrix room.
 
-The bridge uses [mautrix-go bridgev2](https://github.com/mautrix/go/tree/main/bridgev2) for the Matrix side and [libgadu](https://github.com/wojtekka/libgadu) for the GG protocol.
+The bridge uses [mautrix-go bridgev2](https://github.com/mautrix/go/tree/main/bridgev2) for the Matrix side and a vendored copy of [libgadu](https://github.com/wojtekka/libgadu) for the GG protocol (`third_party/libgadu`, with TLS and build fixes).
 
 > **Status: early development (0.1.0-dev).** The bridge runs against the real GG servers and is in daily use on one server since October 2026. Expect bugs and changes. See [SPEC.md](SPEC.md) for the plan and the open decisions.
 
@@ -44,7 +44,7 @@ GG has no edits, reactions or replies. The bridge rejects edits and reactions an
 ## Requirements
 
 - A Matrix homeserver that supports application services (Synapse, Tuwunel, Continuwuity and others).
-- Docker, or a Linux build environment with Go 1.26 or later, a C compiler, `pkg-config` and `libgadu-dev`.
+- Docker, or a Linux build environment with Go 1.26 or later, a C compiler, `cmake`, `pkg-config`, and the GnuTLS and zlib development files.
 
 ## Set up with Docker
 
@@ -87,25 +87,24 @@ GG has no edits, reactions or replies. The bridge rejects edits and reactions an
 
 ## Build from source
 
+The bridge uses its own copy of libgadu in `third_party/libgadu`. Build it first. The script makes a static library and a `libgadu.pc` file in `.deps/libgadu`. It needs no root access.
+
 ```sh
-sudo apt install golang libgadu-dev pkg-config gcc
+sudo apt install golang gcc cmake pkg-config libgnutls28-dev zlib1g-dev
+scripts/build-libgadu.sh
+. scripts/dev-env.sh
 go build -tags goolm -o matrix-gadu ./cmd/matrix-gadu
+go test -tags goolm ./...
 ```
 
-The `goolm` tag selects the pure-Go encryption library, so you do not need `libolm`.
+The `goolm` tag selects the pure-Go encryption library, so you do not need `libolm`. The binary links libgadu statically. At run time, it needs only the GnuTLS and zlib shared libraries.
 
-### Build without root access
-
-If you cannot install `libgadu-dev`, unpack the Debian or Ubuntu packages into `.deps/root` and use `scripts/dev-env.sh`:
+To run the libgadu tests:
 
 ```sh
-mkdir -p .deps/debs && cd .deps/debs
-apt-get download libgadu-dev libgadu3t64
-for f in *.deb; do dpkg-deb -x "$f" ../root; done
-cd ../..
-. scripts/dev-env.sh
-go build -tags goolm ./...
-go test -tags goolm ./...
+cmake -S third_party -B .deps/libgadu-tests -DENABLE_TESTS=ON
+cmake --build .deps/libgadu-tests
+ctest --test-dir .deps/libgadu-tests
 ```
 
 ## Bot commands
@@ -186,8 +185,9 @@ pkg/gadu            Go API for GG (no Matrix code) and the contact list parser
 pkg/gadu/libgadu    libgadu implementation (the only cgo code)
 pkg/gadu/fake       in-memory implementation for tests
 pkg/connector       bridgev2 network connector
+third_party/libgadu vendored libgadu 1.12.2 with fixes (LGPL-2.1)
 ```
 
 ## License
 
-The bridge is licensed under the GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE). It uses mautrix-go (MPL-2.0) and links to libgadu (LGPL-2.1).
+The bridge is licensed under the GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE). It uses mautrix-go (MPL-2.0) and links statically to libgadu (LGPL-2.1, source in `third_party/libgadu`), which bundles the protobuf-c runtime (BSD-2-Clause).
