@@ -1,0 +1,11 @@
+#pragma once
+
+#define HAVE_GNUTLS_2_12
+#define HAVE_GNUTLS_CERTIFICATE_SET_X509_SYSTEM_TRUST
+#define GG_CONFIG_SSL_SYSTEM_TRUST
+
+#cmakedefine HAVE_STRTOULL
+#cmakedefine HAVE__STRTOUI64
+#cmakedefine HAVE__VSCPRINTF
+#cmakedefine HAVE__EXIT
+#cmakedefine HAVE_MKSTEMP

@@ -1,0 +1,354 @@
+#-----------------------------------------------------------------------------
+# Sending regular message
+#-----------------------------------------------------------------------------
+
+call {
+	gg_send_message(session, GG_CLASS_CHAT, 123456, (unsigned char*) "Tęśt");
+}
+
+expect data (7d 00 00 00, auto, 0a 08 01 06 "123456", 10 08, 18 01, 2a 06 "Tęśt", 32 13 "<span>Tęśt</span>")
+
+#-----------------------------------------------------------------------------
+# Sending rich-text legacy style message
+#-----------------------------------------------------------------------------
+
+call {
+	const char format[] = {
+		2,
+		15, 0,
+		0, 0, GG_FONT_BOLD, 
+		1, 0, GG_FONT_ITALIC,
+		2, 0, GG_FONT_UNDERLINE,
+		3, 0, GG_FONT_COLOR, 0x12, 0x34, 0x56
+	};
+
+	gg_send_message_richtext(session, GG_CLASS_CHAT | GG_CLASS_ACK, 123456, (unsigned char*) "Tęśt", (unsigned char*) format, sizeof(format));
+}
+
+expect data (7d 00 00 00, auto, 0a 08 01 06 "123456", 10 08, 18 02, 2a 06 "Tęśt", 32 bf 01 "<span style=\"color:#000000; font-family:'MS Shell Dlg 2'; font-size:9pt; \"><b>T</b><i>ę</i><u>ś</u></span><span style=\"color:#123456; font-family:'MS Shell Dlg 2'; font-size:9pt; \">t</span>")
+
+#-----------------------------------------------------------------------------
+# Sending "rich-text" message with empty format attributes
+#-----------------------------------------------------------------------------
+
+call {
+	gg_send_message_richtext(session, GG_CLASS_CHAT | GG_CLASS_ACK, 123456, (unsigned char*) "Tęśt", NULL, 0);
+}
+
+expect data (7d 00 00 00, auto, 0a 08 01 06 "123456", 10 08, 18 03, 2a 06 "Tęśt", 32 13 "<span>Tęśt</span>")
+
+#-----------------------------------------------------------------------------
+# Sending HTML message
+#-----------------------------------------------------------------------------
+
+call {
+	gg_send_message_html(session, GG_CLASS_CHAT | GG_CLASS_ACK, 123456, (unsigned char*) "<span style=\"color:#000000; font-family:'MS Shell Dlg 2'; font-size:9pt; \">Tęśt</span>");
+}
+
+expect data (7d 00 00 00, auto, 0a 08 01 06 "123456", 10 08, 18 04, 2a 06 "Tęśt", 32 58 "<span style=\"color:#000000; font-family:'MS Shell Dlg 2'; font-size:9pt; \">Tęśt</span>")
+
+#-----------------------------------------------------------------------------
+# Sending HTML message lacking any formatting
+#-----------------------------------------------------------------------------
+
+call {
+	gg_send_message_html(session, GG_CLASS_CHAT | GG_CLASS_ACK, 123456, (unsigned char*) "Tęśt");
+}
+
+expect data (7d 00 00 00, auto, 0a 08 01 06 "123456", 10 08, 18 05, 2a 06 "Tęśt", 32 06 "Tęśt")
+
+#-----------------------------------------------------------------------------
+# Sending conference message
+#-----------------------------------------------------------------------------
+
+call {
+	uin_t contacts[] = { 0x111111, 0x222222, 0x333333 };
+
+	gg_send_message_confer(session, GG_CLASS_CHAT | GG_CLASS_ACK, 3, contacts, (unsigned char*) "Tęśt");
+}
+
+expect data (2d 00 00 00, auto, 11 11 11 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 22 22 22 00, 33 33 33 00, 02 06 00 00 00 08 00 00 00)
+expect data (2d 00 00 00, auto, 22 22 22 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 11 11 11 00, 33 33 33 00, 02 06 00 00 00 08 00 00 00)
+expect data (2d 00 00 00, auto, 33 33 33 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 11 11 11 00, 22 22 22 00, 02 06 00 00 00 08 00 00 00)
+
+#-----------------------------------------------------------------------------
+# Sending incorrect conference message, triggered segfault in <=1.11.0
+#-----------------------------------------------------------------------------
+
+call {
+	gg_send_message_confer(session, GG_CLASS_CHAT | GG_CLASS_ACK, 1, NULL, (unsigned char*) "Tęśt");
+}
+
+# expect nothing
+
+#-----------------------------------------------------------------------------
+# Sending conference message with repeated recipients
+#-----------------------------------------------------------------------------
+
+call {
+	uin_t contacts[] = { 0x111111, 0x222222, 0x333333, 0x111111, 0x222222, 0x333333, 0x333333 };
+
+	gg_send_message_confer(session, GG_CLASS_CHAT | GG_CLASS_ACK, 7, contacts, (unsigned char*) "Tęśt");
+}
+
+expect data (2d 00 00 00, auto, 11 11 11 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 06 00 00 00, 22 22 22 00, 33 33 33 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 33 33 33 00, 02 06 00 00 00 08 00 00 00)
+expect data (2d 00 00 00, auto, 22 22 22 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 06 00 00 00, 11 11 11 00, 33 33 33 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 33 33 33 00, 02 06 00 00 00 08 00 00 00)
+expect data (2d 00 00 00, auto, 33 33 33 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 06 00 00 00, 11 11 11 00, 22 22 22 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 33 33 33 00, 02 06 00 00 00 08 00 00 00)
+expect data (2d 00 00 00, auto, 11 11 11 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 06 00 00 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 22 22 22 00, 33 33 33 00, 33 33 33 00, , 02 06 00 00 00 08 00 00 00)
+expect data (2d 00 00 00, auto, 22 22 22 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 06 00 00 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 11 11 11 00, 33 33 33 00, 33 33 33 00, 02 06 00 00 00 08 00 00 00)
+expect data (2d 00 00 00, auto, 33 33 33 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 06 00 00 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 02 06 00 00 00 08 00 00 00)
+expect data (2d 00 00 00, auto, 33 33 33 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 06 00 00 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 11 11 11 00, 22 22 22 00, 33 33 33 00, 02 06 00 00 00 08 00 00 00)
+
+#-----------------------------------------------------------------------------
+# Sending rich-text conference message
+#-----------------------------------------------------------------------------
+
+call {
+	uin_t contacts[] = { 0x111111, 0x222222, 0x333333 };
+	const char format[] = {
+		2,
+		9, 0,
+		0, 0, GG_FONT_BOLD, 
+		1, 0, GG_FONT_ITALIC | GG_FONT_UNDERLINE,
+		2, 0, 0
+	};
+
+	gg_send_message_confer_richtext(session, GG_CLASS_CHAT | GG_CLASS_ACK, 3, contacts, (unsigned char*) "Tęśt", (unsigned char*) format, sizeof(format));
+}
+
+expect data (2d 00 00 00, auto, 11 11 11 00, xx xx xx xx, 28 00 00 00, 82 00 00 00, 87 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 "><b>T</b><i><u>ę</u></i>śt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 22 22 22 00, 33 33 33 00, 02, 09 00, 00 00 01, 01 00 06, 02 00 00)
+expect data (2d 00 00 00, auto, 22 22 22 00, xx xx xx xx, 28 00 00 00, 82 00 00 00, 87 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 "><b>T</b><i><u>ę</u></i>śt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 11 11 11 00, 33 33 33 00, 02, 09 00, 00 00 01, 01 00 06, 02 00 00)
+expect data (2d 00 00 00, auto, 33 33 33 00, xx xx xx xx, 28 00 00 00, 82 00 00 00, 87 00 00 00, "<span" 20 "style=" 22 "color:#000000;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 "><b>T</b><i><u>ę</u></i>śt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 11 11 11 00, 22 22 22 00, 02, 09 00, 00 00 01, 01 00 06, 02 00 00)
+
+#-----------------------------------------------------------------------------
+# Sending HTML conference message
+#-----------------------------------------------------------------------------
+
+call {
+	uin_t contacts[] = { 0x111111, 0x222222, 0x333333 };
+
+	gg_send_message_confer_html(session, GG_CLASS_CHAT | GG_CLASS_ACK, 3, contacts, (unsigned char*) "<span style=\"color:#123456; font-family:'MS Shell Dlg 2'; font-size:9pt; \">Tęśt</span>");
+}
+
+expect data (2d 00 00 00, auto, 11 11 11 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#123456;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 22 22 22 00, 33 33 33 00, 02 06 00 00 00 08 12 34 56)
+expect data (2d 00 00 00, auto, 22 22 22 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#123456;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 11 11 11 00, 33 33 33 00, 02 06 00 00 00 08 12 34 56)
+expect data (2d 00 00 00, auto, 33 33 33 00, xx xx xx xx, 28 00 00 00, 6d 00 00 00, 72 00 00 00, "<span" 20 "style=" 22 "color:#123456;" 20 "font-family:'MS" 20 "Shell" 20 "Dlg" 20 "2';" 20 "font-size:9pt;" 20 22 ">Tęśt</span>" 00, "T" ea 9c "t" 00, 01, 02 00 00 00, 11 11 11 00, 22 22 22 00, 02 06 00 00 00 08 12 34 56)
+
+#-----------------------------------------------------------------------------
+# Receiving regular message
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 11, 22 22 22 22, 33 33 33 33, 44 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00)
+
+expect event GG_EVENT_MSG (
+	msg.sender == 0x11111111
+	msg.seq == 0x22222222
+	msg.time == 0x33333333
+	msg.msgclass == 0x44444444
+	msg.message == "tęśt"
+	msg.xhtml_message == "<b>tęśt</b>"
+
+	msg.recipients_count == 0
+	msg.recipients == NULL
+
+	msg.formats_length == 3
+	msg.formats[0] == (char) 0x00
+	msg.formats[1] == (char) 0x00
+	msg.formats[2] == (char) 0x01
+)
+
+expect data (46 00 00 00, auto, 22 22 22 22)
+
+#-----------------------------------------------------------------------------
+# Receiving rich-text message
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 02, 04 00, 12 34 56 78)
+
+expect event GG_EVENT_MSG (
+	msg.sender == 0x00111111
+	msg.seq == 0x22002222
+	msg.time == 0x33330033
+	msg.msgclass == 0x44444400
+	msg.message == "tęśt"
+	msg.xhtml_message == "<b>tęśt</b>"
+
+	msg.recipients_count == 0
+	msg.recipients == NULL
+
+	msg.formats_length == 3
+	msg.formats[0] == (char) 0x00
+	msg.formats[1] == (char) 0x00
+	msg.formats[2] == (char) 0x01
+)
+
+expect data (46 00 00 00, auto, 22 22 00 22)
+
+#-----------------------------------------------------------------------------
+# Receiving conference message
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 01, 03 00 00 00, 01 00 00 00, 02 00 00 00, 03 00 00 00)
+
+expect event GG_EVENT_MSG (
+	msg.sender == 0x00111111
+	msg.seq == 0x22002222
+	msg.time == 0x33330033
+	msg.msgclass == 0x44444400
+	msg.message == "tęśt"
+	msg.xhtml_message == "<b>tęśt</b>"
+
+	msg.recipients_count == 3
+	msg.recipients[0] == (int) 1
+	msg.recipients[1] == (int) 2
+	msg.recipients[2] == (int) 3
+
+	msg.formats_length == 3
+	msg.formats[0] == (char) 0x00
+	msg.formats[1] == (char) 0x00
+	msg.formats[2] == (char) 0x01
+)
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+# Receiving malformed conference message
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 01, 11 22 33 44)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 01, fe ff ff ff)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 01, 01 00 00 00, 11 22 33)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 01, 01 00 00 00, 11 22 33 44, 01, 01 00 00 00, 22 33 44 55)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+# Receiving rich-text conference message
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 01, 03 00 00 00, 01 00 00 00, 02 00 00 00, 03 00 00 00, 02, 04 00, 12 34 56 78)
+
+expect event GG_EVENT_MSG (
+	msg.sender == 0x00111111
+	msg.seq == 0x22002222
+	msg.time == 0x33330033
+	msg.msgclass == 0x44444400
+	msg.message == "tęśt"
+	msg.xhtml_message == "<b>tęśt</b>"
+
+	msg.recipients_count == 3
+	msg.recipients[0] == (int) 1
+	msg.recipients[1] == (int) 2
+	msg.recipients[2] == (int) 3
+
+	msg.formats_length == 3
+	msg.formats[0] == (char) 0x00
+	msg.formats[1] == (char) 0x00
+	msg.formats[2] == (char) 0x01
+)
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+# Receiving malformed rich-text message
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 01, 03 00 00 00, 01 00 00 00, 02 00 00 00, 03 00 00 00, 02, 04 00, 12 34 56 78, 02, 04 00, 23 45 67 89)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+# Receiving CTCP message
+#-----------------------------------------------------------------------------
+
+send (0a 00 00 00, auto, 11 11 11 11, 22 22 22 22, 33 33 33 33, 10 00 00 00, 02)
+
+expect event GG_EVENT_MSG (
+	msg.msgclass == GG_CLASS_CTCP
+)
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+# Receiving malformed messages
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 00 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 02, 06 00, 00 00 08 00 00 00)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 00 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 02, 06 00, 00 00 08 00 00 00)
+
+expect event GG_EVENT_MSG
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 10 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 02, 06 00, 00 00 08 00 00 00)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, 10 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 02, 06 00, 00 00 08 00 00 00)
+
+expect event GG_EVENT_MSG
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, ff 00 00 00, 2b 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 02, 06 00, 00 00 08 00 00 00)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 11 11 11 00, 22 22 00 22, 33 00 33 33, 00 44 44 44, 26 00 00 00, ff 00 00 00, "<b>tęśt</b>" 00, "t" ea 9c "t" 00, 02, 06 00, 00 00 08 00 00 00)
+
+expect event GG_EVENT_MSG
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+
+#-----------------------------------------------------------------------------
+
+send (2e 00 00 00, auto, 00 00 00 00, 00 00 00 00, 00 00 00 00, 00 00 00 00, 00 00 00 00, 00 00 00 00, "test" 00)
+
+expect event GG_EVENT_NONE
+
+expect data (46 00 00 00, auto, xx xx xx xx)
+

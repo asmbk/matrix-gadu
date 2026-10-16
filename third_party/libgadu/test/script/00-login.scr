@@ -1,0 +1,72 @@
+#-----------------------------------------------------------------------------
+# Successful login
+#-----------------------------------------------------------------------------
+login (uin = 1, password = "")
+expect connect
+send (01 00 00 00, auto, 12 34 56 78)
+expect data (83 00 00 00, auto, xx*266)
+send (03 00 00 00, auto)
+expect event GG_EVENT_CONN_SUCCESS
+logoff
+expect disconnect
+
+#-----------------------------------------------------------------------------
+# Successful login with missing e-mail
+#-----------------------------------------------------------------------------
+
+login (uin = 1, password = "")
+expect connect
+send (01 00 00 00, auto, 12 34 56 78)
+expect data (83 00 00 00, auto, xx*266)
+send (14 00 00 00, auto)
+expect event GG_EVENT_CONN_SUCCESS
+logoff
+expect disconnect
+
+#-----------------------------------------------------------------------------
+# Failed login
+#-----------------------------------------------------------------------------
+
+login (uin = 1, password = "")
+expect connect
+send (01 00 00 00, auto, 12 34 56 78)
+expect data (83 00 00 00, auto, xx*266)
+send (09 00 00 00, auto)
+expect event GG_EVENT_CONN_FAILED
+logoff
+expect disconnect
+
+#-----------------------------------------------------------------------------
+# Login with parameters
+#-----------------------------------------------------------------------------
+login (uin = 0x123456, password = "ABC", status = GG_STATUS_INVISIBLE_DESCR, status_descr = "Test", has_audio = 1, image_size = 255, external_addr = 127.0.0.1, external_port = 0x1234, status_flags = 0x11223344, client_version = "1.2.3.4")
+expect connect
+send (01 00 00 00, auto, 12 34 56 78)
+expect data (83 00 00 00, auto, 0a 02 "pl", 12 09 01 07 "1193046", 1a 14 xx*20, 20 04, 2d 77 ff ee 03, 35 14 06 03 00, 3a 61 "GG-Phoenix/1.2.3.4 (BUILD;WINNT_x86-msvc;rv:11.0,pl;release;standard) (OS;Windows;Windows NT 6.1)", 45 16 00 00 00, 4a 04 "Test", 52 04 00 00 00 00, 5a 58 "avatar,StatusComments,ggaccount,edisc,music_shared,bot,fanpage,pubdir,botCaps,gifts,Gift", 60 ff 01, 68 64, 75 7f 00 00 00, 78 00, 88 01 00)
+send (03 00 00 00, auto)
+expect event GG_EVENT_CONN_SUCCESS
+logoff
+expect disconnect
+
+#-----------------------------------------------------------------------------
+# Login with custom client_version
+#-----------------------------------------------------------------------------
+login (uin = 1, password = "", client_version = "Foobar 1.2.3.4")
+expect connect
+send (01 00 00 00, auto, 12 34 56 78)
+expect data (83 00 00 00, auto, xx*43, 3a 0e "Foobar 1.2.3.4", xx*118)
+send (03 00 00 00, auto)
+expect event GG_EVENT_CONN_SUCCESS
+logoff
+expect disconnect
+
+#-----------------------------------------------------------------------------
+# Simple login before further tests
+#-----------------------------------------------------------------------------
+login (uin = 0x123456, password = "", encoding = GG_ENCODING_UTF8)
+expect connect
+send (01 00 00 00, auto, 12 34 56 78)
+expect data (83 00 00 00, auto, xx*272)
+send (03 00 00 00, auto)
+expect event GG_EVENT_CONN_SUCCESS
+
