@@ -6,7 +6,7 @@ The bridge connects your Matrix account to your GG account. Each GG contact appe
 
 The bridge uses [mautrix-go bridgev2](https://github.com/mautrix/go/tree/main/bridgev2) for the Matrix side and [libgadu](https://github.com/wojtekka/libgadu) for the GG protocol.
 
-> **Status: early development (0.1.0-dev).** The code compiles and passes its unit tests. It has not yet connected to the real GG servers. See [SPEC.md](SPEC.md) for the plan and the open decisions.
+> **Status: early development (0.1.0-dev).** The bridge runs against the real GG servers and is in daily use on one server since October 2026. Expect bugs and changes. See [SPEC.md](SPEC.md) for the plan and the open decisions.
 
 ## Features
 
@@ -21,7 +21,7 @@ The bridge uses [mautrix-go bridgev2](https://github.com/mautrix/go/tree/main/br
 | Contact search by name or number (`search` command) | Done |
 | Messages received while offline | Done |
 | Typing notifications, both directions | Done |
-| Delivery receipts | Done, not yet tested against GG |
+| Delivery receipts | Done |
 | Messages from your other GG clients (multilogon) | Done, not yet tested against GG |
 | Reconnect with backoff, detection of a conflicting GG client | Done |
 | Online status of contacts as Matrix presence (shown by FluffyChat, Element) | Done |
@@ -34,6 +34,8 @@ The bridge uses [mautrix-go bridgev2](https://github.com/mautrix/go/tree/main/br
 | Rooms of offline contacts in the low priority section (`offline_low_priority`) | Done |
 | Your own picture for a contact room (kept, not sent to GG) | Done |
 | Images from GG (GG Drive images and Giphy GIFs become Matrix images; other GG Drive files stay links) | Done |
+| Images from older GG clients such as Kadu (GG image protocol, up to 255 KiB) | Done |
+| Images to older GG clients such as Kadu (made smaller to fit 255 KiB, a link under the image) | Done |
 | Images and files to GG (sent as public links, needs `public_media` in the config and a reverse proxy route) | Done |
 | GG conferences, history import | Not planned for 0.1 |
 

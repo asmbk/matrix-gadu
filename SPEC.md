@@ -454,13 +454,13 @@ It follows the mautrix convention: on the first start without a config, it write
 | **2. Comfort** | Contact list in clients, status and presence, typing, acks, multilogon, `sync-contacts`, `status` | Checklist items 7–10 pass. |
 | **3. Release** | libgadu fork as submodule, CI, multi-arch image, binaries, `0.1.0` tag | A new user can set up the bridge from the README alone. |
 
-### 15.1 Implementation state (2026-10-11)
+### 15.1 Implementation state (2026-10-16)
 
 | Phase | State |
 |---|---|
-| 0 | `cmd/gadu-spike` and `pkg/gadu/libgadu` are written and compile. **Not yet run against the GG servers.** |
-| 1 | Connector, login, DM portals, text both ways, ghost names, offline messages, `reconnect`, Docker image and README are done. Unit and connector tests pass (with `-race`). Manual checklist not run. |
-| 2 | Done: contact list for clients, typing both ways, delivery receipts, multilogon messages, `sync-contacts`, `status`. Not done: presence (section 7.6). |
+| 0 | Done. The bridge runs against the real GG servers every day since 2026-10-12. |
+| 1 | Done and in daily use. Unit and connector tests pass (with `-race`). |
+| 2 | Done: contact list for clients, typing both ways, delivery receipts, multilogon messages, `sync-contacts`, `status`, presence, avatars, contact list edits, blocking, images both ways. Multilogon is not yet tested against GG. |
 | 3 | Not started: libgadu fork, release builds, multi-arch image. CI workflow exists. |
 
 ## 16. Risks
