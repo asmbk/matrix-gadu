@@ -15,6 +15,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          # The cache key does not cover pkg-config output, so a cache from a
+          # build against another libgadu keeps its old linker flags.
+          cache: false
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake libgnutls28-dev zlib1g-dev pkg-config
       - name: Build libgadu
