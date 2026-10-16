@@ -28,7 +28,7 @@ Any homeserver administrator can run it for the users of that homeserver.
 Today, the usual way to reach GG from Matrix is a chain of programs, for example:
 
 ```
-Matrix client ─▶ homeserver ─▶ IRC bridge (Heisenbridge) ─▶ IRC ─▶ BitlBee ─▶ libpurple (prpl-gg) ─▶ libgadu ─▶ GG
+Matrix client → homeserver → IRC bridge (Heisenbridge) → IRC → BitlBee → libpurple (prpl-gg) → libgadu → GG
 ```
 
 The IRC layer in this chain causes these problems:
@@ -93,14 +93,16 @@ The project keeps its own fork of libgadu for fixes (section 11.2).
 
 ## 5. Architecture
 
-```
-┌──────────────┐   Client-Server API   ┌────────────┐  appservice API  ┌──────────────────────────────┐
-│ Matrix       │ ◀──────────────────▶ │ homeserver │ ◀──────────────▶ │ matrix-gadu                  │
-│ clients      │                       └────────────┘                   │  ├─ bridgev2 (mautrix-go)    │
-└──────────────┘                                                        │  ├─ pkg/connector            │
-                                                                        │  └─ pkg/gadu  (Go API)       │
-                                                                        │      └─ cgo ─▶ libgadu (C)   │──TLS──▶ GG servers
-                                                                        └──────────────────────────────┘
+```mermaid
+flowchart LR
+    clients["Matrix clients"] <-->|Client-Server API| hs["homeserver"]
+    hs <-->|appservice API| bridgev2
+    subgraph bridge["matrix-gadu"]
+        bridgev2["bridgev2 (mautrix-go)"] --> connector["pkg/connector"]
+        connector --> gadu["pkg/gadu (Go API)"]
+        gadu -->|cgo| libgadu["libgadu (C)"]
+    end
+    libgadu <-->|TLS| gg["GG servers"]
 ```
 
 ### 5.1 Repository layout
